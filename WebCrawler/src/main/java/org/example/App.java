@@ -15,15 +15,31 @@ public class App {
     static Connection con;
     static Statement statement;
     static Statement statement1;
+
+    static final String mustContain = "chitkara.edu.in";
+
     static final String baseURL = "https://www.chitkara.edu.in/";
-    static void getLinks(String URL) throws Exception {
+
+    static boolean isValidLink(String link,String absLink){
+        return !link.contains("#")
+                && !link.contains("%")
+                && (link.length()>1)
+                && absLink.contains(mustContain)
+                && !absLink.endsWith(".pdf") && !absLink.endsWith(".jpg") && !absLink.endsWith(".gif")
+                && !absLink.endsWith(".doc")
+                && !absLink.endsWith(".docx");
+    }
+
+
+    static void getLinks(String URL,int depth) throws Exception {
 
 
         ResultSet resultSet = statement.executeQuery("select * from crawler_data where link='"+URL+"'");
 
+
         if(resultSet.next()){
 
-            if(resultSet.getInt("is_visited") == 1 || resultSet.getInt("is_not_reachable")==1){
+            if(resultSet.getInt("is_visited") == 1 || resultSet.getInt("is_not_reachable")==1 || depth >=3 ){
                 return;
             }
 
@@ -36,14 +52,16 @@ public class App {
         for(Element page:element){
 
             String link = page.attr("href");
+            String absLink=page.attr("abs:href");
 
-            String query = "select * from crawler_data where link = '"+page.attr("abs:href")+"';";
+            String query = "select * from crawler_data where link = '"+absLink+"';";
 
             ResultSet resultSet1 = statement.executeQuery(query);
 
 
-            if(!link.contains("#") && !link.contains("%") && (link.length()>1) && !resultSet1.next()){
-                String sql ="insert into crawler_data values('"+page.attr("abs:href")+"',0,0);";
+            if( !resultSet1.next() && isValidLink(link,absLink) ){
+                String sql ="insert into crawler_data values('"+absLink+"',0,0,"+(depth+1)+");";
+                System.out.println(sql);
 
                 statement.execute(sql);
 
@@ -64,19 +82,20 @@ public class App {
         st1.execute("CREATE TABLE IF NOT EXISTS crawler_data(link varchar(2038),is_visited int,is_not_reachable int);");
 
 
-        getLinks(baseURL);
+        getLinks(baseURL,0);
 
         ResultSet resultSet = statement1.executeQuery("select *  from crawler_data where is_visited=0;");
 
         while(resultSet.next()){
 
             String link = resultSet.getString("link");
+            int depth =resultSet.getInt("depth");
 
             try {
 
                 System.out.println("Fetching "+link+"......");
 
-                getLinks(link);
+                getLinks(link,depth);
 
                 statement1.execute("update crawler_data set is_visited = 1 where link = '"+link+"'");
 
