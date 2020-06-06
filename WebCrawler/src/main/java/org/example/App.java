@@ -16,7 +16,7 @@ public class App {
     static Statement statement;
     static Statement statement1;
     static final String baseURL = "https://www.chitkara.edu.in/";
-    static void getLinks(String URL) throws SQLException, IOException, UnknownHostException {
+    static void getLinks(String URL) throws Exception {
 
 
         ResultSet resultSet = statement.executeQuery("select * from crawler_data where link='"+URL+"'");
@@ -31,16 +31,18 @@ public class App {
 
         Document doc = Jsoup.connect(URL).get();
 
-        Elements element = doc.select("a[href]");
+        Elements element = doc.select("a");
 
         for(Element page:element){
+
+            String link = page.attr("href");
 
             String query = "select * from crawler_data where link = '"+page.attr("abs:href")+"';";
 
             ResultSet resultSet1 = statement.executeQuery(query);
 
 
-            if(!resultSet1.next()){
+            if(!link.contains("#") && !link.contains("%") && (link.length()>1) && !resultSet1.next()){
                 String sql ="insert into crawler_data values('"+page.attr("abs:href")+"',0,0);";
 
                 statement.execute(sql);
@@ -51,17 +53,13 @@ public class App {
 
     }
 
-    public static void main(String[] args) throws SQLException, IOException {
-        con = DriverManager.getConnection("jdbc:mysql://localhost:3306/<database_name>","<user_name>","<yourpassword>");
+    public static void main(String[] args) throws Exception {
+        con = DriverManager.getConnection("jdbc:mysql://localhost:3306/mydb","root","java2003");
 
         statement = con.createStatement();
         statement1 = con.createStatement();
 
-        if(con == null){
-            System.out.println(false);
-        }else{
-            System.out.println(true);
-        }
+
         Statement st1 = con.createStatement();
         st1.execute("CREATE TABLE IF NOT EXISTS crawler_data(link varchar(2038),is_visited int,is_not_reachable int);");
 
@@ -76,25 +74,16 @@ public class App {
 
             try {
 
-                System.out.println("Fetching "+link+" ......");
+                System.out.println("Fetching "+link+"......");
 
                 getLinks(link);
 
                 statement1.execute("update crawler_data set is_visited = 1 where link = '"+link+"'");
 
                 resultSet = statement1.executeQuery("select *  from crawler_data where is_visited=0;");
-            } catch (UnknownHostException e){
-
-                Statement st = con.createStatement();
-                st.execute("update crawler_data set is_not_reachable = 1 where link = '"+link+"'");
-            }
-            catch (UnsupportedMimeTypeException e){
+            } catch (Exception e){
                 Statement st = con.createStatement();
                 st.execute("delete from crawler_data where link = '"+link+"'");
-            }
-            catch (Exception e){
-                Statement st = con.createStatement();
-                st.execute("update crawler_data set is_not_reachable = 1 where link = '"+link+"'");
             }
 
         }
